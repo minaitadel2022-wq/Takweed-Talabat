@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const os = require('os');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const compression = require('compression');const { unzip, zip } = require('./lib/minizip');
+const compression = require('compression');
 const { localISODate, localISOMonth } = require('./public/js/dateUtils');
 const { buildEditDetails } = require('./lib/auditDiff');
 const { hasPermission, sanitizePermissions, GRANTABLE_PERMISSION_KEYS } = require('./public/js/permissions');
