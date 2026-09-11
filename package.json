@@ -1,0 +1,20 @@
+{
+  "name": "quote-system",
+  "version": "1.0.0",
+  "description": "نظام تكويد ومتابعة طلبات وعروض أسعار العملاء",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "xlsx-chart": "^0.4.3"
+  }
+}

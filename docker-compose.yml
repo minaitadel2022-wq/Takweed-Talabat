@@ -1,0 +1,22 @@
+services:
+  quote-system:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATA_DIR=/data
+      # لو السيرفر متاح على الإنترنت وقاعد خلف Nginx/Load Balancer حقيقي، فعّل دي:
+      # - TRUST_PROXY=1
+      # حدد يوزر وباسورد قويين لأول مدير عام (Super Admin) قبل أول تشغيل فعلي.
+      # لو سبتهم من غير قيمة، السيرفر هيولّد باسورد عشوائي قوي ويطبعه في اللوج
+      # مرة واحدة بس عند أول تشغيل — افتحه بـ: docker compose logs
+      - ADMIN_USERNAME=admin
+      # - ADMIN_PASSWORD=غيّرها_بكلمة_سر_قوية_من_عندك
+    volumes:
+      # فولوم دائم — البيانات والباك أب هتفضل موجودة حتى لو الكونتينر اتشال أو اتعمله rebuild.
+      - quote-system-data:/data
+    restart: unless-stopped
+
+volumes:
+  quote-system-data:

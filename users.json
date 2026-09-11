@@ -1,0 +1,14 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "username": "Ultra Admin",
+      "name": "Ultra Admin",
+      "role": "super_admin",
+      "branchCode": "SP",
+      "protected": true,
+      "salt": "36396bf310510bd79f37480e9239fb57",
+      "hash": "b80eb711fb6072aeace8fdc99a81c7b9245efc130ffcf7bf36939d35e71604862618710dd8489998ae0f08c15f57db03f37366bde988d5f187376eb90c0fdcb7"
+    }
+  ]
+}
