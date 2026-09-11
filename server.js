@@ -6,9 +6,9 @@ const os = require('os');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
-const { localISODate, localISOMonth } = require('./public/js/dateUtils');
-const { buildEditDetails } = require('./lib/auditDiff');
-const { hasPermission, sanitizePermissions, GRANTABLE_PERMISSION_KEYS } = require('./public/js/permissions');
+// const { localISODate, localISOMonth } = require('./public/js/dateUtils');
+// const { buildEditDetails } = require('./lib/auditDiff');
+// const { hasPermission, sanitizePermissions, GRANTABLE_PERMISSION_KEYS } = require('./public/js/permissions');
 const XLSXChart = require('xlsx-chart');
 
 const app = express();
@@ -2435,9 +2435,9 @@ app.get('/api/users', requireSuperAdmin, (req, res) => {
 // write a readable "granted X / revoked Y" line whenever a user's
 // permissions change (see describePermissionChanges below).
 const PERMISSION_LABELS_AR = {};
-for (const g of require('./public/js/permissions').PERMISSION_GROUPS) {
-  for (const p of g.perms) PERMISSION_LABELS_AR[p.key] = p.label_ar;
-}
+// for (const g of require('./public/js/permissions').PERMISSION_GROUPS) {
+//   for (const p of g.perms) PERMISSION_LABELS_AR[p.key] = p.label_ar;
+// }
 function describePermissionChanges(before, after) {
   const lines = [];
   for (const key of GRANTABLE_PERMISSION_KEYS) {
