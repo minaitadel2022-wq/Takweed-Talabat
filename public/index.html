@@ -3876,6 +3876,44 @@ function renderHome(){
   }catch(e){ console.error('renderHome: recent-requests table failed', e); }
 }
 
+// Copies a short 5-line summary of a request to the clipboard, meant to be
+// pasted straight into an Outlook email: company name, the request code,
+// the two assigned engineers, and a closing "شكراً".
+async function copyRequestStatement(id){
+  const r = DATA.records.find(x=>x.id===id);
+  if(!r) return;
+  const lines = [
+    `طلب من شركة ${r.company || r.customer || ''}`,
+    r.code || '',
+    `مهندس المبيعات المختص : ${r.salesEngineer || ''}`,
+    `مهندس المكتب الفني : ${r.techOfficeEngineer || ''}`,
+    'شكراً'
+  ];
+  const text = lines.join('\n');
+  let copied = false;
+  try{
+    await navigator.clipboard.writeText(text);
+    copied = true;
+  }catch(e){
+    // Fallback for contexts where the async Clipboard API isn't available.
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    }catch(e2){ copied = false; }
+  }
+  const btn = document.getElementById('copyStmtBtn_'+id);
+  if(btn){
+    const original = btn.innerHTML;
+    btn.innerHTML = copied
+      ? `<i class="ti ti-check" style="font-size:13px;"></i> ${LANG==='ar'?'تم النسخ ✓':'Copied ✓'}`
+      : `<i class="ti ti-x" style="font-size:13px;"></i> ${LANG==='ar'?'تعذر النسخ':'Copy failed'}`;
+    setTimeout(()=>{ btn.innerHTML = original; }, 1800);
+  }
+}
+
 function renderRequests(){
   const ar = LANG === 'ar';
   const q = (document.getElementById('searchRequests').value||'').trim();
@@ -3890,6 +3928,7 @@ function renderRequests(){
     let actions = '';
     if(can('move_to_followup')) actions += `<button class="btn btn-primary btn-sm" onclick="moveToFollowup('${r.id}')"><i class="ti ti-arrow-left" style="font-size:13px;"></i> ${ar?'ترحيل للمتابعة':'Move to Follow-up'}</button>`;
     if(can('edit_request')) actions += `<button class="btn btn-ghost btn-sm" onclick="openEditQuote('${r.id}')"><i class="ti ti-edit" style="font-size:13px;"></i> ${ar?'تعديل':'Edit'}</button>`;
+    actions += `<button class="btn btn-ghost btn-sm" id="copyStmtBtn_${r.id}" onclick="copyRequestStatement('${r.id}')"><i class="ti ti-copy" style="font-size:13px;"></i> ${ar?'نسخ بيان الطلب':'Copy Request Statement'}</button>`;
     actions += `<button class="btn btn-ghost btn-sm" onclick="openProductImages('${r.id}')"><i class="ti ti-photo" style="font-size:13px;"></i> ${ar?'صور المنتج':'Product Images'}${r.productImages&&r.productImages.length? ' ('+r.productImages.length+')' : ''}</button>`;
     actions += `<button class="btn btn-ghost btn-sm" onclick="openSampleImages('${r.id}')"><i class="ti ti-camera" style="font-size:13px;"></i> ${ar?'صور عينة للمنتج':'Product Sample Images'}${r.sampleImages&&r.sampleImages.length? ' ('+r.sampleImages.length+')' : ''}</button>`;
     return `
