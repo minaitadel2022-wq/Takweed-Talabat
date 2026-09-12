@@ -3937,7 +3937,13 @@ function sendToAI(engine){
     : `https://chatgpt.com/?q=${encoded}`;
   window.open(url, '_blank', 'noopener');
 }
-document.getElementById('navAskAI').addEventListener('click', () => openAskAI(''));
+document.getElementById('navAskAI').addEventListener('click', () => {
+  // If the person had text selected on the page (e.g. a customer name or
+  // item description they highlighted with the mouse) just before clicking,
+  // prefill the box with it instead of opening empty.
+  const selectedText = (window.getSelection && window.getSelection().toString().trim()) || '';
+  openAskAI(selectedText);
+});
 document.getElementById('askAIChatGPT').addEventListener('click', () => sendToAI('chatgpt'));
 document.getElementById('askAIGemini').addEventListener('click', () => sendToAI('gemini'));
 
