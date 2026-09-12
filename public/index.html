@@ -803,7 +803,18 @@ tr:hover td{background:var(--paper);}
       <select id="rPriority"><option value="عالي">عالي</option><option value="متوسط" selected>متوسط</option><option value="ضعيف">ضعيف</option></select>
     </div>
     <div class="field"><label>ملاحظات</label><textarea id="rNotes"></textarea></div>
-    <div class="modal-actions"><button class="btn btn-primary" id="saveNewRequest">حفظ وتكويد الطلب</button><button class="btn btn-ghost" onclick="closeOverlay('overlayNewRequest')">إلغاء</button></div>
+    <div class="field"><label>صور المنتج</label>
+      <div id="rProductImgGrid" class="img-grid"></div>
+      <div id="rProductImgEmpty" class="img-empty">لا توجد صور مضافة بعد</div>
+      <button type="button" class="btn btn-ghost btn-sm" id="rProductImgAddBtn"><i class="ti ti-plus" style="font-size:13px;"></i> إضافة صور</button>
+    </div>
+    <div class="field"><label>صور عينة للمنتج</label>
+      <div id="rSampleImgGrid" class="img-grid"></div>
+      <div id="rSampleImgEmpty" class="img-empty">لا توجد صور مضافة بعد</div>
+      <button type="button" class="btn btn-ghost btn-sm" id="rSampleImgAddBtn"><i class="ti ti-plus" style="font-size:13px;"></i> إضافة صور</button>
+    </div>
+    <div class="img-upload-status" id="rImgUploadStatus"></div>
+    <div class="modal-actions"><button class="btn btn-primary" id="saveNewRequest">حفظ وتكويد الطلب</button><button class="btn btn-ghost" id="cancelNewRequest">إلغاء</button></div>
   </div>
 </div>
 
@@ -1103,6 +1114,8 @@ tr:hover td{background:var(--paper);}
 <input type="file" id="techOfferDocFileInput" accept=".docx" style="display:none;">
 <input type="file" id="productImagesFileInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;">
 <input type="file" id="sampleImagesFileInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;">
+<input type="file" id="rProductImagesFileInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;">
+<input type="file" id="rSampleImagesFileInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;">
 <script>
 // localISODate/localISOMonth/daysBetweenISO/todayLocalISO/daysWordAr all come
 // from the shared public/js/dateUtils.js (loaded above) — the SAME file
@@ -2476,6 +2489,77 @@ async function loadData(){
 }
 
 // ================= New Request =================
+// Staged (not-yet-uploaded) product/sample images picked while filling in a
+// brand-new price request — held client-side as File objects until the
+// record actually exists, then uploaded to it via the same endpoints the
+// post-creation "صور المنتج"/"صور عينة للمنتج" galleries use.
+let rStagedProductImages = []; // { file, url }
+let rStagedSampleImages = [];
+
+function renderStagedImages(kind){
+  const isProduct = kind === 'product';
+  const list = isProduct ? rStagedProductImages : rStagedSampleImages;
+  const grid = document.getElementById(isProduct ? 'rProductImgGrid' : 'rSampleImgGrid');
+  const empty = document.getElementById(isProduct ? 'rProductImgEmpty' : 'rSampleImgEmpty');
+  grid.innerHTML = '';
+  empty.style.display = list.length ? 'none' : 'block';
+  list.forEach((entry, idx)=>{
+    const cell = document.createElement('div');
+    cell.className = 'img-thumb';
+    const img = document.createElement('img');
+    img.src = entry.url; img.alt = entry.file.name || '';
+    img.onclick = ()=> window.open(entry.url, '_blank');
+    const del = document.createElement('button');
+    del.className = 'img-del';
+    del.title = LANG==='ar' ? 'حذف الصورة' : 'Remove image';
+    del.innerHTML = '<i class="ti ti-x"></i>';
+    del.onclick = ()=> removeStagedImage(kind, idx);
+    cell.appendChild(img); cell.appendChild(del);
+    grid.appendChild(cell);
+  });
+}
+function removeStagedImage(kind, idx){
+  const list = kind === 'product' ? rStagedProductImages : rStagedSampleImages;
+  const [removed] = list.splice(idx, 1);
+  if(removed) URL.revokeObjectURL(removed.url);
+  renderStagedImages(kind);
+}
+function clearStagedImages(){
+  rStagedProductImages.forEach(e=>URL.revokeObjectURL(e.url));
+  rStagedSampleImages.forEach(e=>URL.revokeObjectURL(e.url));
+  rStagedProductImages = []; rStagedSampleImages = [];
+  renderStagedImages('product'); renderStagedImages('sample');
+  document.getElementById('rImgUploadStatus').textContent = '';
+}
+document.getElementById('rProductImgAddBtn').addEventListener('click', ()=> document.getElementById('rProductImagesFileInput').click());
+document.getElementById('rSampleImgAddBtn').addEventListener('click', ()=> document.getElementById('rSampleImagesFileInput').click());
+document.getElementById('rProductImagesFileInput').addEventListener('change', (e)=>{
+  Array.from(e.target.files || []).forEach(file => rStagedProductImages.push({ file, url: URL.createObjectURL(file) }));
+  e.target.value = ''; renderStagedImages('product');
+});
+document.getElementById('rSampleImagesFileInput').addEventListener('change', (e)=>{
+  Array.from(e.target.files || []).forEach(file => rStagedSampleImages.push({ file, url: URL.createObjectURL(file) }));
+  e.target.value = ''; renderStagedImages('sample');
+});
+// Uploads a batch of staged File objects to an already-created record, one at
+// a time, reusing the exact same raw-body upload endpoints as the regular
+// post-creation image galleries (/images and /sample-images).
+async function uploadStagedImagesTo(recordId, endpoint, staged, statusEl, labelAr, labelEn){
+  let done = 0;
+  for(const entry of staged){
+    if(statusEl) statusEl.textContent = LANG==='ar' ? `جاري رفع ${labelAr}... (${done+1} من ${staged.length})` : `Uploading ${labelEn}... (${done+1} of ${staged.length})`;
+    try{
+      const buf = await entry.file.arrayBuffer();
+      const res = await apiFetch(`/api/records/${recordId}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': entry.file.type || 'image/jpeg', 'X-Image-Name': encodeURIComponent(entry.file.name || 'صورة') },
+        body: buf
+      });
+      if(res.ok) done++;
+    }catch(e){ /* best-effort — skip a failed file and continue with the rest */ }
+  }
+  return done;
+}
 document.getElementById('btnNewRequest').addEventListener('click', ()=>{
   ['rCustomer','rCompany','rPhone','rEmail','rSalesEngineer','rTechOfficeEngineer','rNotes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('rOrderType').value = 'طلب سعر عادي';
@@ -2486,7 +2570,12 @@ document.getElementById('btnNewRequest').addEventListener('click', ()=>{
   document.getElementById('rBranchCode').value = 'SP';
   rFormItems = [{item:'',description:'',brand:''}];
   renderItemsEditor('rItemsList', rFormItems, false);
+  clearStagedImages();
   openOverlay('overlayNewRequest');
+});
+document.getElementById('cancelNewRequest').addEventListener('click', ()=>{
+  clearStagedImages();
+  closeOverlay('overlayNewRequest');
 });
 // "اليوم المحدد" field now covers both "طلب يوم محدد" (fixed-date requests)
 // and "مناقصة" (tenders) — both need a deadline for the due-date alerts on
@@ -2517,7 +2606,15 @@ document.getElementById('saveNewRequest').addEventListener('click', async ()=>{
       notes: document.getElementById('rNotes').value.trim(),
       branchCode: isSuperAdmin() ? document.getElementById('rBranchCode').value : undefined
     });
+    if(rStagedProductImages.length || rStagedSampleImages.length){
+      const statusEl = document.getElementById('rImgUploadStatus');
+      if(rStagedProductImages.length) await uploadStagedImagesTo(rec.id, 'images', rStagedProductImages, statusEl, 'صور المنتج', 'product images');
+      if(rStagedSampleImages.length) await uploadStagedImagesTo(rec.id, 'sample-images', rStagedSampleImages, statusEl, 'صور العينة', 'sample images');
+      try{ const j1 = await apiGet('/api/records/'+rec.id+'/images'); rec.productImages = j1.images || []; }catch(e){}
+      try{ const j2 = await apiGet('/api/records/'+rec.id+'/sample-images'); rec.sampleImages = j2.images || []; }catch(e){}
+    }
     DATA.records.push(rec); render(); closeOverlay('overlayNewRequest');
+    clearStagedImages();
   }catch(e){ alert((LANG==='ar'?'حدث خطأ أثناء الحفظ: ':'An error occurred while saving: ')+e.message); }
 });
 
@@ -3793,6 +3890,8 @@ function renderRequests(){
     let actions = '';
     if(can('move_to_followup')) actions += `<button class="btn btn-primary btn-sm" onclick="moveToFollowup('${r.id}')"><i class="ti ti-arrow-left" style="font-size:13px;"></i> ${ar?'ترحيل للمتابعة':'Move to Follow-up'}</button>`;
     if(can('edit_request')) actions += `<button class="btn btn-ghost btn-sm" onclick="openEditQuote('${r.id}')"><i class="ti ti-edit" style="font-size:13px;"></i> ${ar?'تعديل':'Edit'}</button>`;
+    actions += `<button class="btn btn-ghost btn-sm" onclick="openProductImages('${r.id}')"><i class="ti ti-photo" style="font-size:13px;"></i> ${ar?'صور المنتج':'Product Images'}${r.productImages&&r.productImages.length? ' ('+r.productImages.length+')' : ''}</button>`;
+    actions += `<button class="btn btn-ghost btn-sm" onclick="openSampleImages('${r.id}')"><i class="ti ti-camera" style="font-size:13px;"></i> ${ar?'صور عينة للمنتج':'Product Sample Images'}${r.sampleImages&&r.sampleImages.length? ' ('+r.sampleImages.length+')' : ''}</button>`;
     return `
     <tr><td><span class="code-badge">${esc(r.code)}</span></td>
     <td>${custCell(r.customer, r.company)}</td>
@@ -3847,6 +3946,8 @@ function followupRecordRowsHtml(r, colorFilter, canUpdateStatus, zebra){
     if(can('convert_to_quote')) actionsHtml += `<button class="btn btn-primary btn-sm" onclick="openToQuote('${r.id}')"><i class="ti ti-arrow-left" style="font-size:13px;"></i> ${ar?'تحويل لعرض سعر':'Convert to Quote'}</button>`;
   }
   if(can('edit_request')) actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openEditQuote('${r.id}')"><i class="ti ti-edit" style="font-size:13px;"></i> ${ar?'تعديل':'Edit'}</button>`;
+  actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openProductImages('${r.id}')"><i class="ti ti-photo" style="font-size:13px;"></i> ${ar?'صور المنتج':'Product Images'}${r.productImages&&r.productImages.length? ' ('+r.productImages.length+')' : ''}</button>`;
+  actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openSampleImages('${r.id}')"><i class="ti ti-camera" style="font-size:13px;"></i> ${ar?'صور عينة للمنتج':'Product Sample Images'}${r.sampleImages&&r.sampleImages.length? ' ('+r.sampleImages.length+')' : ''}</button>`;
 
   return idxs.map((origIdx, pos) => {
     const it = allItems[origIdx];
@@ -4101,10 +4202,15 @@ function renderClosedRequests(){
   const list = DATA.records.filter(r=>r.stage==='closed' && dateInRange(r.closedAt,'fromDateClosedRequests','toDateClosedRequests') && (fuzzyIncludes(r.customer, q) || fuzzyIncludes(r.code, q)));
   VISIBLE_LIST.closedrequests = list;
   document.getElementById('closedRequestsSummary').innerHTML = resultsSummaryHtml(list);
-  document.getElementById('closedRequestsBody').innerHTML = list.map(r=>`
-    <tr><td><span class="code-badge">${esc(r.code)}</span></td><td>${custCell(r.customer, r.company)}</td>
+  document.getElementById('closedRequestsBody').innerHTML = list.map(r=>{
+    let actions = '';
+    if(can('close_followup')) actions += `<button class="btn btn-primary btn-sm" onclick="revertToFollowup('${r.id}')"><i class="ti ti-refresh" style="font-size:13px;"></i> ${ar?'إرجاع للمتابعة':'Revert to Follow-up'}</button>`;
+    actions += `<button class="btn btn-ghost btn-sm" onclick="openProductImages('${r.id}')"><i class="ti ti-photo" style="font-size:13px;"></i> ${ar?'صور المنتج':'Product Images'}${r.productImages&&r.productImages.length? ' ('+r.productImages.length+')' : ''}</button>`;
+    actions += `<button class="btn btn-ghost btn-sm" onclick="openSampleImages('${r.id}')"><i class="ti ti-camera" style="font-size:13px;"></i> ${ar?'صور عينة للمنتج':'Product Sample Images'}${r.sampleImages&&r.sampleImages.length? ' ('+r.sampleImages.length+')' : ''}</button>`;
+    return `<tr><td><span class="code-badge">${esc(r.code)}</span></td><td>${custCell(r.customer, r.company)}</td>
     <td>${itemsSummary(r)}</td><td>${esc(r.closeReason)||'—'}</td><td class="num">${r.closedAt? fmtDate(r.closedAt) : '—'}</td><td>${esc(r.closedBy)||'—'}</td>
-    <td>${can('close_followup')? `<button class="btn btn-primary btn-sm" onclick="revertToFollowup('${r.id}')"><i class="ti ti-refresh" style="font-size:13px;"></i> ${ar?'إرجاع للمتابعة':'Revert to Follow-up'}</button>` : ''}</td></tr>`).join('');
+    <td><div class="actions-cell">${actions}</div></td></tr>`;
+  }).join('');
   document.getElementById('closedRequestsEmpty').style.display = list.length? 'none':'block';
 }
 

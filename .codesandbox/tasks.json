@@ -1,0 +1,18 @@
+{
+  "$schema": "https://codesandbox.io/schemas/tasks.json",
+  // بتتنفذ مرة واحدة لما الـ Devbox يتفتح/يتعمله fork، قبل أي تاسك تاني.
+  "setupTasks": [
+    { "name": "Install Dependencies", "command": "npm install" }
+  ],
+  // دي التاسك اللي كانت بتشغّل node --watch index.js قبل كده — دلوقتي
+  // بتشغّل نظام تكويد طلبات العملاء الحقيقي (npm start -> node server.js)
+  // تلقائياً كل مرة يتفتح فيها الـ Devbox.
+  "tasks": {
+    "start": {
+      "name": "Start (npm start -> server.js)",
+      "command": "npm start",
+      "runAtStart": true,
+      "preview": { "port": 3000 }
+    }
+  }
+}
