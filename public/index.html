@@ -3884,7 +3884,7 @@ async function copyRequestStatement(id){
   if(!r) return;
   const lines = [
     `طلب من شركة ${r.company || r.customer || ''}`,
-    r.code || '',
+    `رقم طلب السعر:${r.code || ''}`,
     `مهندس المبيعات المختص : ${r.salesEngineer || ''}`,
     `مهندس المكتب الفني : ${r.techOfficeEngineer || ''}`,
     'شكراً'
