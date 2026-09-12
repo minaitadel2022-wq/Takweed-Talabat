@@ -3937,12 +3937,18 @@ function sendToAI(engine){
     : `https://chatgpt.com/?q=${encoded}`;
   window.open(url, '_blank', 'noopener');
 }
+// Clicking the nav item collapses whatever text was selected on the page
+// (the mousedown that starts the click already clears it) before our click
+// handler ever runs — so reading window.getSelection() there always comes
+// back empty. Track the last non-empty selection continuously instead, and
+// use that snapshot when the button is clicked.
+let LAST_SELECTED_TEXT = '';
+document.addEventListener('selectionchange', () => {
+  const sel = (window.getSelection && window.getSelection().toString().trim()) || '';
+  if(sel) LAST_SELECTED_TEXT = sel;
+});
 document.getElementById('navAskAI').addEventListener('click', () => {
-  // If the person had text selected on the page (e.g. a customer name or
-  // item description they highlighted with the mouse) just before clicking,
-  // prefill the box with it instead of opening empty.
-  const selectedText = (window.getSelection && window.getSelection().toString().trim()) || '';
-  openAskAI(selectedText);
+  openAskAI(LAST_SELECTED_TEXT);
 });
 document.getElementById('askAIChatGPT').addEventListener('click', () => sendToAI('chatgpt'));
 document.getElementById('askAIGemini').addEventListener('click', () => sendToAI('gemini'));
