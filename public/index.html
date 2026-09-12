@@ -397,6 +397,7 @@ tr:hover td{background:var(--paper);}
     <div class="nav-item" id="navBackup" style="display:none;"><span class="nav-icon"><i class="ti ti-database-export"></i></span> نسخة احتياطية الآن</div>
     <div class="nav-item" id="navRestore" style="display:none;"><span class="nav-icon"><i class="ti ti-database-import"></i></span> استرجاع نسخة احتياطية</div>
     <div class="nav-item" id="navImportSP"><span class="nav-icon"><i class="ti ti-file-spreadsheet"></i></span> استيراد SP</div>
+    <div class="nav-item" id="navAskAI"><span class="nav-icon"><i class="ti ti-sparkles"></i></span> <span id="navAskAILabel">اسأل AI</span></div>
     <div class="nav-item" id="navLang"><span class="nav-icon"><i class="ti ti-language"></i></span> English</div>
     <div class="nav-item" id="navTheme"><span class="nav-icon"><i class="ti ti-moon"></i></span> الوضع الليلي</div>
     <div class="sidebar-footer">
@@ -951,6 +952,24 @@ tr:hover td{background:var(--paper);}
   </div>
 </div>
 
+<!-- Ask AI Modal: opens the text in ChatGPT or Gemini's own web app in a new
+     tab, using whichever account the person is already logged into there —
+     no API key, no shared account, nothing sent through our server. -->
+<div class="overlay" id="overlayAskAI">
+  <div class="modal">
+    <h3><i class="ti ti-sparkles" style="font-size:16px;"></i> <span id="askAITitle">اسأل AI</span></h3>
+    <div class="field">
+      <label id="askAILabel">اكتب سؤالك أو حدد النص اللي عايز تبحث عنه</label>
+      <textarea id="askAIText" rows="5" style="width:100%;resize:vertical;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="askAIChatGPT"><i class="ti ti-brand-openai" style="font-size:14px;"></i> <span id="askAIChatGPTLabel">افتح في ChatGPT</span></button>
+      <button class="btn btn-primary" id="askAIGemini"><i class="ti ti-sparkles" style="font-size:14px;"></i> <span id="askAIGeminiLabel">افتح في Gemini</span></button>
+      <button class="btn btn-ghost" onclick="closeOverlay('overlayAskAI')" id="askAICloseLabel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
 <!-- Quote Status Statement Modal (بيان آخر حالة لعرض السعر) -->
 <div class="overlay" id="overlayQuoteStatement">
   <div class="modal modal-wide">
@@ -1288,6 +1307,12 @@ function applyStaticLanguage(){
   setIconText('#navBackup', ar ? 'نسخة احتياطية الآن' : 'Backup Now');
   setIconText('#navRestore', ar ? 'استرجاع نسخة احتياطية' : 'Restore Backup');
   setIconText('#navImportSP', ar ? 'استيراد SP' : 'Import SP');
+  setText('#navAskAILabel', ar ? 'اسأل AI' : 'Ask AI');
+  setText('#askAITitle', ar ? 'اسأل AI' : 'Ask AI');
+  setText('#askAILabel', ar ? 'اكتب سؤالك أو حدد النص اللي عايز تبحث عنه' : 'Type your question, or the text you want to look up');
+  setText('#askAIChatGPTLabel', ar ? 'افتح في ChatGPT' : 'Open in ChatGPT');
+  setText('#askAIGeminiLabel', ar ? 'افتح في Gemini' : 'Open in Gemini');
+  setText('#askAICloseLabel', ar ? 'إلغاء' : 'Cancel');
   setIconText('#navLang', ar ? 'English' : 'العربية');
   setIconText('#btnLogout', ar ? 'خروج' : 'Logout');
   setAttr('#btnLogout', 'title', ar ? 'تسجيل الخروج' : 'Log out');
@@ -3883,6 +3908,39 @@ function isArabicText(s){
   return /[\u0600-\u06FF]/.test(s||'');
 }
 
+// Builds a short plain-text summary of a request (customer/company, items,
+// brand, description) to prefill the "Ask AI" box with — so the person can
+// search for the item/brand without retyping it.
+function aiSummaryForRecord(id){
+  const r = DATA.records.find(x=>x.id===id);
+  if(!r) return '';
+  const items = recItems(r).map(it => [it.item, it.description, it.brand].filter(Boolean).join(' - ')).filter(Boolean).join('; ');
+  return [r.company || r.customer || '', items].filter(Boolean).join(' — ');
+}
+
+// Opens the given text as a question in ChatGPT or Gemini's own web app, in
+// a new tab — it runs on whichever account is already logged into the
+// browser (not a shared account, no API key/billing on our side). The text
+// is also copied to the clipboard as a fallback, since the "q=" prefill
+// param isn't guaranteed to carry over on every login state/browser.
+function openAskAI(prefillText){
+  document.getElementById('askAIText').value = prefillText || '';
+  openOverlay('overlayAskAI');
+}
+function sendToAI(engine){
+  const text = (document.getElementById('askAIText').value || '').trim();
+  if(!text) return;
+  try{ navigator.clipboard && navigator.clipboard.writeText(text); }catch(e){}
+  const encoded = encodeURIComponent(text);
+  const url = engine === 'gemini'
+    ? `https://gemini.google.com/app?q=${encoded}`
+    : `https://chatgpt.com/?q=${encoded}`;
+  window.open(url, '_blank', 'noopener');
+}
+document.getElementById('navAskAI').addEventListener('click', () => openAskAI(''));
+document.getElementById('askAIChatGPT').addEventListener('click', () => sendToAI('chatgpt'));
+document.getElementById('askAIGemini').addEventListener('click', () => sendToAI('gemini'));
+
 // Copies a short 5-line summary of a request to the clipboard, meant to be
 // pasted straight into an Outlook email: company name, the request code,
 // the two assigned engineers, and a closing thanks line. Each line's label
@@ -3942,6 +4000,7 @@ function renderRequests(){
     if(can('move_to_followup')) actions += `<button class="btn btn-primary btn-sm" onclick="moveToFollowup('${r.id}')"><i class="ti ti-arrow-left" style="font-size:13px;"></i> ${ar?'ترحيل للمتابعة':'Move to Follow-up'}</button>`;
     if(can('edit_request')) actions += `<button class="btn btn-ghost btn-sm" onclick="openEditQuote('${r.id}')"><i class="ti ti-edit" style="font-size:13px;"></i> ${ar?'تعديل':'Edit'}</button>`;
     actions += `<button class="btn btn-ghost btn-sm" id="copyStmtBtn_${r.id}" onclick="copyRequestStatement('${r.id}')"><i class="ti ti-copy" style="font-size:13px;"></i> ${ar?'نسخ بيان الطلب':'Copy Request Statement'}</button>`;
+    actions += `<button class="btn btn-ghost btn-sm" onclick="openAskAI(aiSummaryForRecord('${r.id}'))"><i class="ti ti-sparkles" style="font-size:13px;"></i> ${ar?'ابحث بالـ AI':'Ask AI'}</button>`;
     actions += `<button class="btn btn-ghost btn-sm" onclick="openProductImages('${r.id}')"><i class="ti ti-photo" style="font-size:13px;"></i> ${ar?'صور المنتج':'Product Images'}${r.productImages&&r.productImages.length? ' ('+r.productImages.length+')' : ''}</button>`;
     actions += `<button class="btn btn-ghost btn-sm" onclick="openSampleImages('${r.id}')"><i class="ti ti-camera" style="font-size:13px;"></i> ${ar?'صور عينة للمنتج':'Product Sample Images'}${r.sampleImages&&r.sampleImages.length? ' ('+r.sampleImages.length+')' : ''}</button>`;
     return `
@@ -3998,6 +4057,7 @@ function followupRecordRowsHtml(r, colorFilter, canUpdateStatus, zebra){
     if(can('convert_to_quote')) actionsHtml += `<button class="btn btn-primary btn-sm" onclick="openToQuote('${r.id}')"><i class="ti ti-arrow-left" style="font-size:13px;"></i> ${ar?'تحويل لعرض سعر':'Convert to Quote'}</button>`;
   }
   if(can('edit_request')) actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openEditQuote('${r.id}')"><i class="ti ti-edit" style="font-size:13px;"></i> ${ar?'تعديل':'Edit'}</button>`;
+  actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openAskAI(aiSummaryForRecord('${r.id}'))"><i class="ti ti-sparkles" style="font-size:13px;"></i> ${ar?'ابحث بالـ AI':'Ask AI'}</button>`;
   actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openProductImages('${r.id}')"><i class="ti ti-photo" style="font-size:13px;"></i> ${ar?'صور المنتج':'Product Images'}${r.productImages&&r.productImages.length? ' ('+r.productImages.length+')' : ''}</button>`;
   actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openSampleImages('${r.id}')"><i class="ti ti-camera" style="font-size:13px;"></i> ${ar?'صور عينة للمنتج':'Product Sample Images'}${r.sampleImages&&r.sampleImages.length? ' ('+r.sampleImages.length+')' : ''}</button>`;
 
