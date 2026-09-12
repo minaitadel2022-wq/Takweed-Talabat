@@ -3876,18 +3876,31 @@ function renderHome(){
   }catch(e){ console.error('renderHome: recent-requests table failed', e); }
 }
 
+// True if the given text contains Arabic script; used to pick the label
+// language for each line of the copied statement independently, based on
+// what was actually typed into that field.
+function isArabicText(s){
+  return /[\u0600-\u06FF]/.test(s||'');
+}
+
 // Copies a short 5-line summary of a request to the clipboard, meant to be
 // pasted straight into an Outlook email: company name, the request code,
-// the two assigned engineers, and a closing "شكراً".
+// the two assigned engineers, and a closing thanks line. Each line's label
+// is Arabic or English depending on the language of that line's own value.
 async function copyRequestStatement(id){
   const r = DATA.records.find(x=>x.id===id);
   if(!r) return;
+  const companyVal = r.company || r.customer || '';
+  const codeVal = r.code || '';
+  const salesVal = r.salesEngineer || '';
+  const techVal = r.techOfficeEngineer || '';
+  const mainAr = isArabicText(companyVal);
   const lines = [
-    `طلب من شركة ${r.company || r.customer || ''}`,
-    `رقم طلب السعر:${r.code || ''}`,
-    `مهندس المبيعات المختص : ${r.salesEngineer || ''}`,
-    `مهندس المكتب الفني : ${r.techOfficeEngineer || ''}`,
-    'شكراً'
+    mainAr ? `طلب من شركة ${companyVal}` : `Order from company ${companyVal}`,
+    mainAr ? `رقم طلب السعر ${codeVal}` : `Price request No ${codeVal}`,
+    isArabicText(salesVal) ? `مهندس المبيعات المختص ${salesVal}` : `Sales Engineer ${salesVal}`,
+    isArabicText(techVal) ? `مهندس المكتب الفني ${techVal}` : `Technical Office Engineer ${techVal}`,
+    mainAr ? 'شكراً' : 'Thank you'
   ];
   const text = lines.join('\n');
   let copied = false;
